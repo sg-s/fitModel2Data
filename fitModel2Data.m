@@ -33,6 +33,11 @@
 % To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/4.0/.
 function [varargout] = fitModel2Data(modelname,data,varargin)
 
+% check for optimisation toolbox
+v = ver;
+assert(any(strcmp('Optimization Toolbox', {v.Name})),'optimisation toolbox is required')
+assert(any(strcmp('Global Optimization Toolbox', {v.Name})),'Global Optimization Toolbox is required')
+
 
 % options and defaults
 options.use_cache = true;
