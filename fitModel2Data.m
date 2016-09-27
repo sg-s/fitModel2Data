@@ -44,6 +44,7 @@ options.p0 = [];
 options.lb = [];
 options.ub = [];
 options.minimise_r2 = false;
+options.engine = 'patternsearch';
 
 % figure out if we should make a plot or not
 options.make_plot = 0;
@@ -201,12 +202,34 @@ end
 
 % pattern search options
 if options.nsteps
-	psoptions = psoptimset('UseParallel',options.use_parallel, 'Vectorized', 'off','Cache','on','CompletePoll','on','Display',options.display_type,'MaxIter',options.nsteps,'MaxFunEvals',options.max_fun_evals);
-	% search
-	if options.minimise_r2
-		x = patternsearch(@(x) r2CostFunction(x,data,modelname,param_names),x0,[],[],[],[],lb,ub,psoptions);
-	else
-		x = patternsearch(@(x) generalCostFunction(x,data,modelname,param_names),x0,[],[],[],[],lb,ub,psoptions);
+	switch options.engine
+	case 'patternsearch'
+		psoptions = psoptimset('UseParallel',options.use_parallel, 'Vectorized', 'off','Cache','on','CompletePoll','on','Display',options.display_type,'MaxIter',options.nsteps,'MaxFunEvals',options.max_fun_evals);
+		% search
+		if options.minimise_r2
+			x = patternsearch(@(x) r2CostFunction(x,data,modelname,param_names),x0,[],[],[],[],lb,ub,psoptions);
+		else
+			x = patternsearch(@(x) generalCostFunction(x,data,modelname,param_names),x0,[],[],[],[],lb,ub,psoptions);
+		end
+	case 'fmincon'
+		foptions = optimset('Display',options.display_type,'MaxIter',options.nsteps,'UseParallel',options.use_parallel,'MaxFunEvals',options.max_fun_evals);
+
+		
+		problem.x0 = x0;
+		problem.ub = ub;
+		problem.lb = lb;
+		problem.solver = 'fmincon';
+		problem.options = foptions;
+		% search
+		if options.minimise_r2
+			problem.objective = @(x) r2CostFunction(x,data,modelname,param_names);
+			
+		else
+			problem.objective = @(x) generalCostFunction(x,data,modelname,param_names);
+			
+		end
+		x = fmincon(problem);
+
 	end
 else
 	varargout{1} = p0;
