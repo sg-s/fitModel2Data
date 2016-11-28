@@ -50,6 +50,8 @@ options.lb = [];
 options.ub = [];
 options.minimise_r2 = false;
 options.engine = 'patternsearch';
+options.tol_mesh = 1e-6;
+options.tol_x = 1e-6;
 
 % figure out if we should make a plot or not
 options.make_plot = 0;
@@ -209,7 +211,7 @@ end
 if options.nsteps
 	switch options.engine
 	case 'patternsearch'
-		psoptions = psoptimset('UseParallel',options.use_parallel, 'Vectorized', 'off','Cache','on','CompletePoll','on','Display',options.display_type,'MaxIter',options.nsteps,'MaxFunEvals',options.max_fun_evals);
+		psoptions = psoptimset('UseParallel',options.use_parallel, 'Vectorized', 'off','Cache','on','CompletePoll','on','Display',options.display_type,'MaxIter',options.nsteps,'MaxFunEvals',options.max_fun_evals,'TolMesh',options.tol_mesh,'TolX',options.tol_x);
 		% search
 		if options.minimise_r2
 			x = patternsearch(@(x) r2CostFunction(x,data,modelname,param_names),x0,[],[],[],[],lb,ub,psoptions);
