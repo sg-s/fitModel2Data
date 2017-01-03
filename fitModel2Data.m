@@ -369,7 +369,11 @@ end
 			end
 			% take a weighted average of the costs
 			w = w/max(w);
-			c = mean(c.*w);
+			if ~isnan(w)
+				c = mean(c.*w);
+			else
+				c = mean(c);
+			end
 
 		end
 
