@@ -41,6 +41,7 @@ assert(any(strcmp('Global Optimization Toolbox', {v.Name})),'Global Optimization
 
 % options and defaults
 options.use_cache = true;
+options.purge_cache = false;
 options.use_parallel = true;
 options.nsteps = 300;
 options.display_type = 'iter';
@@ -106,6 +107,10 @@ end
 % hash the data and model name together 
 hash = dataHash(data);
 hash = dataHash([dataHash(modelname) hash]);
+
+if options.purge_cache
+	cache(hash,[])
+end
 
 % check if seed parameter structure is provided
 if ~isempty(options.p0)
@@ -250,7 +255,14 @@ p = mat2struct(x,param_names);
 % save to cache only if this solution is better than the best. 
 current_cost = generalCostFunction(x,data,modelname,param_names);
 hash2 = dataHash(['best solution to ' hash]);
+
+
+if options.purge_cache
+	cache(hash2,[])
+end
+
 best_cost = cache(hash2);
+
 if isempty(best_cost)
 	% first time, cache this
 	cache(hash,p);
