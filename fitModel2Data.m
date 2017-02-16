@@ -282,6 +282,10 @@ else
 		cache(hash2,current_cost);
 		disp('This is the best known parameter set for this data')
 	end
+	temp = fieldnames(p);
+	for i = 1:length(temp)
+		disp(['p.' temp{i} ' = ' oval(p.(temp{i}),4) ';'])
+	end
 end
 
 
