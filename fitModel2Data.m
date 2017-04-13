@@ -312,7 +312,8 @@ if options.make_plot
 			hold on
 			t = 1:length(data(i).response);
 			fp = modelname(data(i).stimulus,mat2struct(x,param_names));
-			plotyy(t,data(i).response,t,fp)
+			plot(t,data(i).response,'k')
+			plot(t,fp,'r')
 			% show r-square
 			r2 = rsquare(fp,data(i).response);
 			
