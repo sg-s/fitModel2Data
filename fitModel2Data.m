@@ -29,8 +29,7 @@
 %
 % created by Srinivas Gorur-Shandilya at 12:35 , 08 December 2014. Contact me at http://srinivas.gs/contact/
 % 
-% This work is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License. 
-% To view a copy of this license, visit http://creativecommons.org/licenses/by-nc-sa/4.0/.
+
 function [varargout] = fitModel2Data(modelname,data,varargin)
 
 % check for optimisation toolbox
@@ -40,26 +39,23 @@ assert(any(strcmp('Global Optimization Toolbox', {v.Name})),'Global Optimization
 
 
 % options and defaults
-options.use_cache = true;
-options.purge_cache = false;
-options.use_parallel = true;
-options.nsteps = 300;
-options.display_type = 'iter';
-options.max_fun_evals = 2e4;
+
+options.UseParallel = true;
+options.MaxIter = 300;
+options.Display = 'iter';
+options.MaxFunEvals = 2e4;
 options.p0 = [];
 options.lb = [];
 options.ub = [];
 options.minimise_r2 = false;
 options.engine = 'patternsearch';
-options.tol_mesh = 1e-6;
-options.tol_x = 1e-6;
-
-% figure out if we should make a plot or not
-options.make_plot = 0;
+options.TolMesh = 1e-6;
+options.TolX = 1e-6;
+options.MakePlot = true;
 
 calling_func = dbstack;
 if length(calling_func) == 1
-	options.make_plot = 1;
+	options.MakePlot = true;
 end
 
 if nargout && ~nargin 
@@ -67,27 +63,8 @@ if nargout && ~nargin
 	return
 end
 
-% validate and accept options
-if iseven(length(varargin))
-	for ii = 1:2:length(varargin)-1
-	temp = varargin{ii};
-    if ischar(temp)
-    	if ~any(find(strcmp(temp,fieldnames(options))))
-    		disp(['Unknown option: ' temp])
-    		disp('The allowed options are:')
-    		disp(fieldnames(options))
-    		error('UNKNOWN OPTION')
-    	else
-    		options = setfield(options,temp,varargin{ii+1});
-    	end
-    end
-end
-elseif isstruct(varargin{1})
-	% should be OK...
-	options = varargin{1};
-else
-	error('Inputs need to be name value pairs')
-end
+options = corelib.parseNameValueArguments(options, varargin{:});
+
 
 % validate inputs
 if ~isa(modelname,'function_handle')
@@ -104,27 +81,13 @@ else
 	error('RTFM')
 end
 
-% hash the data and model name together 
-hash = dataHash(data);
-hash = dataHash([dataHash(modelname) hash]);
 
-if options.purge_cache
-	cache(hash,[])
-end
 
 % check if seed parameter structure is provided
 if ~isempty(options.p0)
 	p0 = options.p0;
 else
-	if options.use_cache
-		% check the cache for p0
-		p0 = cache(hash);
-		if isempty(p0)
-			p0 = getModelParameters(char(modelname));
-		end
-	else
-		p0 = getModelParameters(char(modelname));
-	end
+	p0 = getModelParameters(char(modelname));
 end
 [x0, param_names] = struct2mat(p0);
 f = fieldnames(p0);
@@ -213,18 +176,19 @@ end
 
 
 % pattern search options
-if options.nsteps
+if options.MaxIter > 0
 	switch options.engine
 	case 'patternsearch'
-		psoptions = psoptimset('UseParallel',options.use_parallel, 'Vectorized', 'off','Cache','on','CompletePoll','on','Display',options.display_type,'MaxIter',options.nsteps,'MaxFunEvals',options.max_fun_evals,'TolMesh',options.tol_mesh,'TolX',options.tol_x);
 		% search
+		psoptions = psoptimset('UseParallel',options.UseParallel, 'Vectorized', 'off','Cache','on','CompletePoll','on','Display',options.Display,'MaxIter',options.MaxIter,'MaxFunEvals',options.MaxFunEvals,'TolMesh',options.TolMesh,'TolX',options.TolX);
 		if options.minimise_r2
-			x = patternsearch(@(x) r2CostFunction(x,data,modelname,param_names),x0,[],[],[],[],lb,ub,psoptions);
+			x = patternsearch(@(x) r2CostFunction(x,data,modelname,param_names),x0,[],[],[],[],lb,ub, psoptions);
 		else
-			x = patternsearch(@(x) generalCostFunction(x,data,modelname,param_names),x0,[],[],[],[],lb,ub,psoptions);
+
+			x = patternsearch(@(x) generalCostFunction(x,data,modelname,param_names),x0,[],[],[],[],lb,ub, psoptions);
 		end
 	case 'fmincon'
-		foptions = optimset('Display',options.display_type,'MaxIter',options.nsteps,'UseParallel',options.use_parallel,'MaxFunEvals',options.max_fun_evals);
+		foptions = optimset('Display',options.display_type,'MaxIterations',options.MaxIterations,'UseParallel',options.UseParallel,'MaxFunEvals',options.MaxFunEvals);
 
 		
 		problem.x0 = x0;
@@ -252,83 +216,39 @@ end
 % assign outputs
 p = mat2struct(x,param_names);
 
-% save to cache only if this solution is better than the best. 
-current_cost = generalCostFunction(x,data,modelname,param_names);
-hash2 = dataHash(['best solution to ' hash]);
-
-
-if options.purge_cache
-	cache(hash2,[])
-end
-
-best_cost = cache(hash2);
-
-if isempty(best_cost)
-	% first time, cache this
-	cache(hash,p);
-	% also cache the cost of this solution
-	cache(hash2,current_cost);
-else
-	% check if current cost is lower than best cost
-	if current_cost > best_cost
-		disp('This is not the best possible parameter set. For this dataset, these parameters:')
-		disp(cache(hash))
-		disp('do a better job, with a cost of:')
-		disp(best_cost)
-	else
-		% update cache
-		cache(hash,p);
-		% also cache the cost of this solution
-		cache(hash2,current_cost);
-		disp('This is the best known parameter set for this data')
-	end
-	temp = fieldnames(p);
-	for i = 1:length(temp)
-		disp(['p.' temp{i} ' = ' oval(p.(temp{i}),4) ';'])
-	end
-end
 
 
 
-if options.make_plot
+
+if options.MakePlot
 	figHandles = findall(0,'Type','figure');
-	make_fig = 1;
-	for i = 1:length(figHandles)
-		if ~isempty(figHandles(i).Tag)
-			if strcmp(figHandles(i).Tag,hash)
-				make_fig = 0;
-				figure(figHandles(i));
-				clf(figHandles(i))
-			end
-		end
-	end
+	make_fig = true;
 	if make_fig
 		temp = figure; hold on
-		set(temp,'Tag',hash)
 	end
 	for i = 1:length(data)
 		if options.minimise_r2
-			autoPlot(length(data),i,1);
+			figlib.autoPlot(length(data),i,1);
 			hold on
 			t = 1:length(data(i).response);
 			fp = modelname(data(i).stimulus,mat2struct(x,param_names));
 			plot(t,data(i).response,'k')
 			plot(t,fp,'r')
 			% show r-square
-			r2 = rsquare(fp,data(i).response);
+			r2 = statlib.correlation(fp,data(i).response);
 			
-			title(strcat('r^2=',oval(r2)))
+			title(strcat('r^2=',strlib.oval(r2)))
 			legend({'Data',char(modelname)})
 		else
-			autoPlot(length(data),i,1);
+			figlib.autoPlot(length(data),i,1);
 			hold on
 			plot(data(i).response,'k')
 			fp = modelname(data(i).stimulus,mat2struct(x,param_names));
 			plot(fp,'r')
 			% show r-square
-			r2 = rsquare(fp,data(i).response);
+			r2 = statlib.correlation(fp,data(i).response);
 			
-			title(strcat('r^2=',oval(r2)))
+			title(strcat('r^2=',strlib.oval(r2)))
 			legend({'Data',char(modelname)})
 
 			if length(unique(data(i).response)) > 2
@@ -339,7 +259,7 @@ if options.make_plot
 			end
 		end
 	end
-	prettyFig('plw',1.5,'lw',1.5,'fs',14)
+	figlib.pretty('PlotLineWidth',1.5,'LineWidth',1.5,'FontSize',14)
 end
 
 	function c =  generalCostFunction(x,data,modelname,param_names)
@@ -408,16 +328,16 @@ end
 				if width(data.response) > 1
 					error('This case not coded. 348')
 					% many trials of one data set. solve for each separately
-					c = 0;
-					for i = 1:width(data.response)
-						fp = modelname(data.stimulus(:,i),mat2struct(x,param_names));
-						a = cumsum(data.response(:,i));
-						a = a(:);
-						a = a - linspace(a(1),a(end),length(a))';
-						b = cumsum(fp); b= b(:);
-						b = b - linspace(b(1),b(end),length(b))';
-						c = c + cost2(a,b);
-					end
+					% c = 0;
+					% for j = 1:width(data.response)
+					% 	fp = modelname(data.stimulus(:,j),mat2struct(x,param_names));
+					% 	a = cumsum(data.response(:,j));
+					% 	a = a(:);
+					% 	a = a - linspace(a(1),a(end),length(a))';
+					% 	b = cumsum(fp); b= b(:);
+					% 	b = b - linspace(b(1),b(end),length(b))';
+					% 	c = c + cost2(a,b);
+					% end
 				else
 					a = cumsum(data.response);
 					a = a(:);
@@ -429,24 +349,24 @@ end
 			else
 				% normal data
 				fp = modelname(data.stimulus,mat2struct(x,param_names));
-				c = 1-abs(rsquare(data.response,fp));
+				c = 1-abs(statlib.correlation(data.response,fp));
 			
 			end
 			
 		else
 			% fit to multiple data sets at the same time
 			error('This case not coded. 377')
-			c = NaN(length(data),1);
-			w = zeros(length(data),1);
-			for i = 1:length(data)
-				fp = modelname(data(i).stimulus,mat2struct(x,param_names));
-				c(i) = cost2(data(i).response,fp);
-				w(i) = sum(~isnan(data(i).response));
-				w(i) = w(i)/std(data(i).response(~isnan(data(i).response)));
-			end
-			% take a weighted average of the costs
-			w = w/max(w);
-			c = mean(c.*w);
+			% c = NaN(length(data),1);
+			% w = zeros(length(data),1);
+			% for i = 1:length(data)
+			% 	fp = modelname(data(i).stimulus,mat2struct(x,param_names));
+			% 	c(i) = cost2(data(i).response,fp);
+			% 	w(i) = sum(~isnan(data(i).response));
+			% 	w(i) = w(i)/std(data(i).response(~isnan(data(i).response)));
+			% end
+			% % take a weighted average of the costs
+			% w = w/max(w);
+			% c = mean(c.*w);
 
 		end
 
