@@ -187,6 +187,18 @@ if options.MaxIter > 0
 
 			x = patternsearch(@(x) generalCostFunction(x,data,modelname,param_names),x0,[],[],[],[],lb,ub, psoptions);
 		end
+
+	case 'particleswarm'
+
+		psoptions = optimoptions('particleswarm');
+		psoptions.UseParallel = options.UseParallel;
+		psoptions.MaxIterations = options.MaxIter;
+
+		psoptions.Display = 'iter';
+
+		psoptions.InitialSwarmMatrix = struct2mat(options.p0);
+
+		x = particleswarm(@(x) generalCostFunction(x,data,modelname,param_names),length(psoptions.InitialSwarmMatrix), lb,ub, psoptions);
 	case 'fmincon'
 		foptions = optimset('Display',options.display_type,'MaxIterations',options.MaxIterations,'UseParallel',options.UseParallel,'MaxFunEvals',options.MaxFunEvals);
 
